@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+
+import aiohttp
+import asyncio
+import os
+import requests
+import time
+from aiohttp import web
+
+NOBIL_REALTIME_API_KEY = os.environ["NOBIL_REALTIME_API_KEY"]
+
+evse_db = {}
+
+async def main():
+    ws_url = get_nobil_realtime_websocket_url()
+    app = aiohttp.web.Application()
+    await start_web_server(app)
+    await nobil_realtime_listener(ws_url)
+
+
+def get_nobil_realtime_websocket_url():
+    response = requests.post("https://api.data.enova.no/nobil/real-time/v1/Realtime",
+                             headers={"x-api-key": NOBIL_REALTIME_API_KEY})
+    return response.json()["accessToken"]
+
+
+async def start_web_server(app):
+    app.add_routes([web.get('/dump', dump_handler),
+                    web.get('/stats', stats_handler),
+                    web.get(r'/{nobil_id:[A-Z]{3}_[0-9]{5}}', nobil_id_handler)])
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, 'localhost', 8080)
+    await site.start()
+
+
+async def dump_handler(request, allow_head=False):
+    return web.json_response(evse_db)
+
+
+async def stats_handler(request, allow_head=False):
+    return web.Response(body="\r\n".join(["Denmark: %d" % len([k for k in evse_db.keys() if k.startswith("DAN_")]),
+                                          "Finland: %d" % len([k for k in evse_db.keys() if k.startswith("FIN_")]),
+                                          "Iceland: %d" % len([k for k in evse_db.keys() if k.startswith("ISL_")]),
+                                          "Norway: %d" % len([k for k in evse_db.keys() if k.startswith("NOR_")]),
+                                          "Sweden: %d" % len([k for k in evse_db.keys() if k.startswith("SWE_")]),
+                                          "---",
+                                          "Total: %d" % len(evse_db),
+                                          ""]))
+
+
+async def nobil_id_handler(request, allow_head=False):
+    nobil_id = request.match_info['nobil_id']
+    if nobil_id not in evse_db:
+        return web.Response(status=404)
+    return web.json_response({"chargeports": evse_db[nobil_id] if nobil_id in evse_db else []})
+
+
+async def nobil_realtime_listener(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.ws_connect(url) as ws:
+            async for msg in ws:
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    evse_data = msg.json()
+                    print(evse_data)
+                    nobil_id, evse_uid, status = evse_data.values()
+
+                    if nobil_id not in evse_db:
+                        evse_db[nobil_id] = []
+                    for i in range(len(evse_db[nobil_id])):
+                        if evse_db[nobil_id][i]["evseUid"] == evse_uid:
+                            del evse_db[nobil_id][i]
+                            break
+
+                    evse_db[nobil_id].append({"evseUid": evse_uid,
+                                              "status": evse_data["status"],
+                                              "timestamp": int(time.time())})
+
+                elif msg.type == aiohttp.WSMsgType.ERROR:
+                    break
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

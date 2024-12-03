@@ -175,6 +175,7 @@ class AvailabilityRepository(context: Context) {
         RheinenergieAvailabilityDetector(okhttp),
         teslaOwnerAvailabilityDetector,
         TeslaGuestAvailabilityDetector(okhttp),
+        NobilAvailabilityDetector(okhttp),
         EnBwAvailabilityDetector(okhttp),
         NewMotionAvailabilityDetector(okhttp)
     )

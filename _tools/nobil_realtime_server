@@ -2,20 +2,31 @@
 
 import aiohttp
 import asyncio
+import json
 import os
 import requests
 import time
 from aiohttp import web
 
 NOBIL_REALTIME_API_KEY = os.environ["NOBIL_REALTIME_API_KEY"]
+NOBIL_REALTIME_DATA_BACKUP_INTERVAL = 30  # seconds
+NOBIL_REALTIME_DATA_BACKUP_FILE = "/tmp/nobil_realtime_data.json"
+NOBIL_REALTIME_DATA_TEMP_BACKUP_FILE = NOBIL_REALTIME_DATA_BACKUP_FILE + ".tmp"
 
 evse_db = {}
 
 async def main():
-    ws_url = get_nobil_realtime_websocket_url()
-    app = aiohttp.web.Application()
-    await start_web_server(app)
-    await nobil_realtime_listener(ws_url)
+    if os.path.isfile(NOBIL_REALTIME_DATA_BACKUP_FILE):
+        with open(NOBIL_REALTIME_DATA_BACKUP_FILE) as backup_file:
+            global evse_db
+            evse_db = json.load(backup_file)
+
+    while True:
+        ws_url = get_nobil_realtime_websocket_url()
+        app = aiohttp.web.Application()
+        await start_web_server(app)
+        await nobil_realtime_listener(ws_url)
+        time.sleep(5)
 
 
 def get_nobil_realtime_websocket_url():
@@ -58,6 +69,7 @@ async def nobil_id_handler(request, allow_head=False):
 
 
 async def nobil_realtime_listener(url):
+    backup_timestamp = 0
     async with aiohttp.ClientSession() as session:
         async with session.ws_connect(url) as ws:
             async for msg in ws:
@@ -77,6 +89,12 @@ async def nobil_realtime_listener(url):
                                               "status": evse_data["status"],
                                               "timestamp": int(time.time())})
 
+                    if time.time() > backup_timestamp + NOBIL_REALTIME_DATA_BACKUP_INTERVAL:
+                        with open(NOBIL_REALTIME_DATA_TEMP_BACKUP_FILE, "w") as backup_file:
+                            json.dump(evse_db, backup_file)
+                            os.fdatasync(backup_file)
+                        os.rename(NOBIL_REALTIME_DATA_TEMP_BACKUP_FILE, NOBIL_REALTIME_DATA_BACKUP_FILE)
+                        backup_timestamp = time.time()
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     break
 

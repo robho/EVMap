@@ -2,6 +2,7 @@ package net.vonforst.evmap.api.availability
 
 import net.vonforst.evmap.model.Chargepoint
 import org.junit.Assert.assertEquals
+import org.junit.Ignore
 import org.junit.Test
 
 class AvailabilityDetectorTest {
@@ -177,6 +178,28 @@ class AvailabilityDetectorTest {
                 mapOf(
                     0L to (27.0 to Chargepoint.TYPE_2_UNKNOWN),
                     1L to (27.0 to Chargepoint.TYPE_2_UNKNOWN)
+                ),
+                chargepoints
+            )
+        )
+    }
+
+    @Ignore("#396: Matching mixed type 2 connectors fails")
+    @Test
+    fun testMatchChargepointsMixedType2Connectors() {
+        // single charger with both type 2 socket and plug
+        val chargepoints = listOf(
+            Chargepoint(Chargepoint.TYPE_2_PLUG, 22.0, 1),
+            Chargepoint(Chargepoint.TYPE_2_SOCKET, 22.0, 1)
+        )
+
+        // EnBw and NewMotion don't distinguish between type 2 sockets and plugs
+        assertEquals(
+            mapOf(chargepoints[0] to setOf(0L), chargepoints[1] to setOf(1L)),
+            BaseAvailabilityDetector.matchChargepoints(
+                mapOf(
+                    0L to (22.0 to Chargepoint.TYPE_2_UNKNOWN),
+                    1L to (22.0 to Chargepoint.TYPE_2_UNKNOWN)
                 ),
                 chargepoints
             )

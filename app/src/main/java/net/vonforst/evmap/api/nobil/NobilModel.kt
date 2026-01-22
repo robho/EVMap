@@ -14,16 +14,11 @@ import net.vonforst.evmap.model.Coordinate
 import net.vonforst.evmap.model.Cost
 import net.vonforst.evmap.model.FilterValues
 import net.vonforst.evmap.model.OpeningHours
-import net.vonforst.evmap.model.ReferenceData
 import net.vonforst.evmap.model.getBooleanValue
 import net.vonforst.evmap.model.getMultipleChoiceValue
 import net.vonforst.evmap.model.getSliderValue
 import java.time.Instant
 import java.time.LocalDateTime
-
-data class NobilReferenceData(
-    val dummy: Int
-) : ReferenceData()
 
 @JsonClass(generateAdapter = true)
 data class NobilNumChargepointsRequest(

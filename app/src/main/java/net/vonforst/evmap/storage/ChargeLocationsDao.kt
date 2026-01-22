@@ -24,6 +24,7 @@ import net.vonforst.evmap.api.StringProvider
 import net.vonforst.evmap.api.goingelectric.GEReferenceData
 import net.vonforst.evmap.api.goingelectric.GoingElectricApiWrapper
 import net.vonforst.evmap.api.nobil.NobilApiWrapper
+import net.vonforst.evmap.api.nobil.NobilReferenceData
 import net.vonforst.evmap.api.openchargemap.OpenChargeMapApiWrapper
 import net.vonforst.evmap.api.openstreetmap.OSMReferenceData
 import net.vonforst.evmap.api.openstreetmap.OpenStreetMapApiWrapper
@@ -201,7 +202,7 @@ class ChargeLocationsRepository(
             }
 
             is NobilApiWrapper -> {
-                NobilReferenceDataRepository(scope, prefs).getReferenceData()
+                NobilReferenceDataRepository(db.nobilReferenceDataDao()).getReferenceData()
             }
 
             is OpenChargeMapApiWrapper -> {
@@ -738,6 +739,10 @@ class ChargeLocationsRepository(
             )
 
             when (api) {
+                is NobilApiWrapper -> {
+                    val refData = result.referenceData
+                    NobilReferenceDataRepository(db.nobilReferenceDataDao()).updateReferenceData(refData as NobilReferenceData)
+                }
                 is OpenStreetMapApiWrapper -> {
                     val refData = result.referenceData
                     OSMReferenceDataRepository(db.osmReferenceDataDao()).updateReferenceData(refData as OSMReferenceData)

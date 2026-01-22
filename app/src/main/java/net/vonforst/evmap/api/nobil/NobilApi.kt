@@ -221,7 +221,7 @@ class NobilApiWrapper(
     }
 
     override suspend fun getReferenceData(): Resource<NobilReferenceData> {
-        return Resource.success(NobilReferenceData(0))
+        throw NotImplementedError()
     }
 
     override fun getFilters(
@@ -247,7 +247,13 @@ class NobilApiWrapper(
             "By appointment" to sp.getString(R.string.accessibility_by_appointment),
             "Residents" to sp.getString(R.string.accessibility_residents)
         )
+        val refData = referenceData as NobilReferenceData
+        val networkMap = refData.networks.associateWith { it }
         return listOf(
+            MultipleChoiceFilter(
+                sp.getString(R.string.filter_networks), "networks",
+                networkMap, manyChoices = true
+            ),
             BooleanFilter(sp.getString(R.string.filter_free_parking), "freeparking"),
             BooleanFilter(sp.getString(R.string.filter_open_247), "open_247"),
             SliderFilter(
@@ -285,6 +291,16 @@ class NobilApiWrapper(
 
         var requiresChargepointQuery = false
         val result = StringBuilder()
+
+        val networks = filters.getMultipleChoiceValue("networks")
+        if (networks != null && !networks.all) {
+            val networksList = if (networks.values.size == 0) {
+                ""
+            } else {
+                networks.values.joinToString(",") { DatabaseUtils.sqlEscapeString(it) }
+            }
+            result.append(" AND network IN (${networksList})")
+        }
 
         if (filters.getBooleanValue("freeparking") == true) {
             result.append(" AND freeparking IS 1")
@@ -331,6 +347,8 @@ class NobilApiWrapper(
     }
 }
 
+data class NobilReferenceData(val networks: List<String>) : ReferenceData()
+
 class NobilFullDownloadResult(private val data: NobilDynamicResponseData,
                               private val numTotalChargepoints: Int) : FullDownloadResult<NobilReferenceData> {
     private var downloadProgress = 0f
@@ -339,13 +357,19 @@ class NobilFullDownloadResult(private val data: NobilDynamicResponseData,
     override val chargers: Sequence<ChargeLocation>
         get() {
             if (data.rights == null) throw JsonDataException("Rights field is missing in received data")
+
+            val networks = mutableSetOf<String>()
             return sequence {
                 data.chargerStations?.forEachIndexed { i, it ->
                     downloadProgress = i.toFloat() / numTotalChargepoints
                     val charger = it.convert(data.rights, null)
+
+                    if (charger?.chargepoints?.any { it.evseUIds?.isNotEmpty() == true } == true) {
+                        charger.network?.let { networks.add(it) }
+                    }
                     charger?.let { yield(charger) }
                 }
-                refData = NobilReferenceData(0)
+                refData = NobilReferenceData(networks.toList())
             }
         }
     override val progress: Float

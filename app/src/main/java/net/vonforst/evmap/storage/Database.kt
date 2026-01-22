@@ -35,12 +35,13 @@ import net.vonforst.evmap.model.SliderFilterValue
         GEPlug::class,
         GENetwork::class,
         GEChargeCard::class,
+        NobilNetwork::class,
         OCMConnectionType::class,
         OCMCountry::class,
         OCMOperator::class,
         OSMNetwork::class,
         SavedRegion::class
-    ], version = 29
+    ], version = 30
 )
 @TypeConverters(Converters::class, GeometryConverters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -53,6 +54,9 @@ abstract class AppDatabase : RoomDatabase() {
 
     // GoingElectric API specific
     abstract fun geReferenceDataDao(): GEReferenceDataDao
+
+    // Nobil API specific
+    abstract fun nobilReferenceDataDao(): NobilReferenceDataDao
 
     // OpenChargeMap API specific
     abstract fun ocmReferenceDataDao(): OCMReferenceDataDao
@@ -85,7 +89,7 @@ abstract class AppDatabase : RoomDatabase() {
                 MIGRATION_12, MIGRATION_13, MIGRATION_14, MIGRATION_15, MIGRATION_16,
                 MIGRATION_17, MIGRATION_18, MIGRATION_19, MIGRATION_20, MIGRATION_21,
                 MIGRATION_22, MIGRATION_23, MIGRATION_24, MIGRATION_25, MIGRATION_26,
-                MIGRATION_27, MIGRATION_28, MIGRATION_29
+                MIGRATION_27, MIGRATION_28, MIGRATION_29, MIGRATION_30
             )
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
@@ -559,6 +563,17 @@ abstract class AppDatabase : RoomDatabase() {
         private val MIGRATION_29 = object : Migration(28, 29) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Force nobil data refresh to update MCS connectors
+                db.execSQL("DELETE FROM SavedRegion WHERE `dataSource` = 'nobil'")
+                db.execSQL("DELETE FROM ChargeLocation WHERE `dataSource` = 'nobil'")
+            }
+        }
+
+        private val MIGRATION_30 = object : Migration(29, 30) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Nobil networks db table added
+                db.execSQL("CREATE TABLE IF NOT EXISTS `NobilNetwork` (`name` TEXT NOT NULL, PRIMARY KEY(`name`))")
+
+                // Force nobil data refresh to update networks list
                 db.execSQL("DELETE FROM SavedRegion WHERE `dataSource` = 'nobil'")
                 db.execSQL("DELETE FROM ChargeLocation WHERE `dataSource` = 'nobil'")
             }

@@ -46,6 +46,21 @@ import java.io.IOException
 import java.time.Duration
 
 private const val maxResults = 2000
+private val networkAliases = listOf(
+    listOf("Connect GO", "Connect Go"),
+    listOf("E.ON", "E.ON Drive Public Sweden", "E.ON Energilösningar AB", "E.ON Norge AS"),
+    listOf("Eviny", "Eviny Sverige"),
+    listOf("Hedemora Energi", "Hedemor Energi"),
+    listOf("Mer", "MER Sweden AB", "Mer Norway"),
+    listOf("OKQ8", "Heavy Duty OKQ8 SE"),
+    listOf("Parkering Göteborg", "Göteborgs Stads Parkering"),
+    listOf("Pay n Charge", "Pay N Charge Nordic AB", "Pay n Charge Norge AS"),
+    listOf("RE&GO", "Re&Go", "RE&GO AB"),
+    listOf("Stella Energy", "STELLA ENERGY NORWAY AS"),
+    listOf("Svorka", "Svorka AS"),
+    listOf("Virta", "Virta Nordic AB", "Virta Global Sweden"),
+    listOf("Wattif", "Wattif Sweden"),
+    )
 
 interface NobilApi {
     @GET("datadump.php")
@@ -248,7 +263,14 @@ class NobilApiWrapper(
             "Residents" to sp.getString(R.string.accessibility_residents)
         )
         val refData = referenceData as NobilReferenceData
-        val networkMap = refData.networks.associateWith { it }
+        val networkMap = refData.networks.map { n ->
+            networkAliases.forEach { aliasGroup ->
+                if (aliasGroup.contains(n)) {
+                    return@map aliasGroup[0]
+                }
+            }
+            n
+        }.associateWith { it }
         return listOf(
             MultipleChoiceFilter(
                 sp.getString(R.string.filter_networks), "networks",
@@ -297,7 +319,15 @@ class NobilApiWrapper(
             val networksList = if (networks.values.size == 0) {
                 ""
             } else {
-                networks.values.joinToString(",") { DatabaseUtils.sqlEscapeString(it) }
+                val networksWithAliases = networks.values.map { n ->
+                    networkAliases.forEach { aliasGroup ->
+                        if (aliasGroup.contains(n)) {
+                            return@map aliasGroup
+                        }
+                    }
+                    listOf(n)
+                }.flatten()
+                networksWithAliases.joinToString(",") { DatabaseUtils.sqlEscapeString(it) }
             }
             result.append(" AND network IN (${networksList})")
         }
